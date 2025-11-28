@@ -1043,12 +1043,17 @@
         globalStatusEl.textContent =
           `معيار ${critIndex}/${activeCriteria.length} - صورة ${fileIndex}/${files.length} (${crit.title})...`;
         try {
-          const durl = await fileToDataURL(f);
-          dataUrls.push(durl);
-        } catch (e) {
-          console.error(e);
-        }
-      }
+    const durl = await fileToDataURL(f);
+    if (!durl || typeof durl !== "string" || !durl.startsWith("data:image")) {
+        console.warn("Bad image skipped:", f.name);
+        continue;
+    }
+    dataUrls.push(durl);
+} catch (err) {
+    console.error("Failed to read file:", f.name, err);
+    continue;
+}
+
 
       if (dataUrls.length === 0) {
         statusEl.textContent = "لم يتم تحويل أي صورة بنجاح لهذا المعيار.";
