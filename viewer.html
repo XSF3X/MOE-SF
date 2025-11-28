@@ -64,43 +64,59 @@
 
 <script>
 (function(){
-  const hash = window.location.hash;
-  if(!hash || !hash.startsWith("#album=")){
-    return; // ابقِ الصفحة على رسالة "مرحباً"
+  const params = new URLSearchParams(window.location.search);
+  const teacher = params.get("teacher");
+  const album = params.get("album");
+
+  if (!teacher || !album) {
+    // ابقِ رسالة الترحيب
+    return;
   }
 
   // إخفاء الرسالة
-  document.getElementById("msgBox").style.display = "none";
+  const msgBox = document.getElementById("msgBox");
+  if (msgBox) msgBox.style.display = "none";
 
   const gallery = document.getElementById("gallery");
   gallery.style.display = "flex";
 
-  try {
-    const encoded = hash.replace("#album=","");
-    const decoded = decodeURIComponent(encoded);
-    const jsonStr = decodeURIComponent( escape(window.atob(decoded)) );
-    const images = JSON.parse(jsonStr);
+  const dataUrl = "https://raw.githubusercontent.com/XSF3X/MOE-SF/main/data.json";
 
-    images.forEach(url=>{
-      const img = document.createElement("img");
-      img.src = url;
-      gallery.appendChild(img);
+  fetch(dataUrl)
+    .then(res => {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    })
+    .then(data => {
+      const teachers = data.teachers || {};
+      const t = teachers[teacher] || {};
+      const albums = t.albums || {};
+      const images = albums[String(album)] || [];
+
+      if (!images.length) {
+        gallery.innerHTML = "<p>لا توجد صور مسجلة لهذا الألبوم.</p>";
+        return;
+      }
+
+      images.forEach(url => {
+        const img = document.createElement("img");
+        img.src = url;
+        gallery.appendChild(img);
+      });
+
+      const btn = document.createElement("button");
+      btn.id = "backBtn";
+      btn.textContent = "رجوع ↩️";
+      btn.onclick = () => window.history.back();
+      gallery.appendChild(btn);
+    })
+    .catch(err => {
+      console.error(err);
+      document.body.innerHTML = "<h2 style='color:white;text-align:center;'>تعذر تحميل بيانات الألبوم</h2>";
     });
-
-    // زر رجوع
-    const btn = document.createElement("button");
-    btn.id = "backBtn";
-    btn.textContent = "رجوع ↩️";
-    btn.onclick = ()=>window.history.back();
-    gallery.appendChild(btn);
-
-  } catch(e){
-    console.error(e);
-    document.body.innerHTML = "<h2 style='color:white;text-align:center;'>حدث خطأ في فتح الألبوم</h2>";
-  }
-
 })();
 </script>
+
 
 </body>
 </html>
