@@ -1,817 +1,533 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF
-  // إعدادات GitHub لتخزين بيانات الألبومات
-  const GITHUB_OWNER = "XSF3X";
-  const GITHUB_REPO = "MOE-SF";
-  const DATA_FILE_PATH = "data.json";
-  const GITHUB_API_BASE = "https://api.github.com";
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  async function getGithubToken() {
-    let token = localStorage.getItem("githubToken");
-    if (!token) {
-      token = prompt("الرجاء إدخال GitHub Personal Access Token الخاص بمستودع MOE-SF:\nلن يُخزَّن هذا التوكن خارج هذا الجهاز، لكنه سيُحفظ في المتصفح لتسهيل الاستخدام.");
-      if (token) {
-        token = token.trim();
-        localStorage.setItem("githubToken", token);
-      } else {
-        throw new Error("لم يتم إدخال التوكن.");
-      }
-    }
-    return token;
-  }
+  <title>نظام رفع الشواهد - ملف الإنجاز</title>
 
-  async function fetchDataJson(token) {
-    const url = `${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${DATA_FILE_PATH}`;
-    const res = await fetch(url, {
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Accept": "application/vnd.github+json"
-      }
-    });
-    if (res.status === 404) {
-      // ملف جديد
-      return { json: { teachers: {} }, sha: null };
-    }
-    if (!res.ok) {
-      const txt = await res.text();
-      throw new Error("GitHub fetch error: " + txt);
-    }
-    const data = await res.json();
-    const decoded = atob(data.content.replace(/\\n/g, ""));
-    let json;
-    try {
-      json = JSON.parse(decoded);
-    } catch (e) {
-      json = { teachers: {} };
-    }
-    return { json, sha: data.sha };
-  }
-
-  async function saveDataJson(token, json, sha) {
-    const url = `${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${DATA_FILE_PATH}`;
-    const contentStr = JSON.stringify(json, null, 2);
-    const base64 = btoa(unescape(encodeURIComponent(contentStr)));
-    const body = {
-      message: "Update teacher albums via MOE-SF web app",
-      content: base64
-    };
-    if (sha) body.sha = sha;
-
-    const res = await fetch(url, {
-      method: "PUT",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Accept": "application/vnd.github+json"
-      },
-      body: JSON.stringify(body)
-    });
-
-    if (!res.ok) {
-      const txt = await res.text();
-      throw new Error("GitHub save error: " + txt);
-    }
-    return await res.json();
-  }
-
-  async function updateAlbumOnGitHub(username, albumId, imageUrls) {
-    const token = await getGithubToken();
-    const { json, sha } = await fetchDataJson(token);
-
-    if (!json.teachers) json.teachers = {};
-    if (!json.teachers[username]) json.teachers[username] = { albums: {} };
-    if (!json.teachers[username].albums) json.teachers[username].albums = {};
-
-    json.teachers[username].albums[String(albumId)] = imageUrls;
-
-    await saveDataJson(token, json, sha);
-  }
--8">
-  <title>ملف إنجاز المعلم - نسخة ويب كاملة (قالب مدمج)</title>
-<div id="teacher-label" style="font-size:12px;color:#e5e7eb;margin-top:4px;">
-    المعلم: <span id="teacher-name"></span>
-</div>
-
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- خط -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
-  <!-- QRCode -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <!-- JSZip لفك وتجميع PPTX -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
   <style>
-    * { box-sizing: border-box; }
+    :root {
+      --bg: #0f172a;
+      --fg: #e2e8f0;
+      --panel: #1e293b;
+      --accent: #3b82f6;
+      --border: #334155;
+      --danger: #ef4444;
+      --success: #22c55e;
+    }
+
     body {
       margin: 0;
-      font-family: "Cairo", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #e5e7eb;
-      color: #111827;
+      padding: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: "Tajawal", sans-serif;
     }
+
     header {
-      background: linear-gradient(90deg, #0f172a, #111827);
-      color: #f9fafb;
-      padding: 12px 20px;
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      flex-wrap: wrap;
+      background: var(--panel);
+      padding: 16px;
+      text-align: center;
+      font-size: 22px;
+      border-bottom: 1px solid var(--border);
     }
-    header .title-block {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
+
+    .container {
+      max-width: 1200px;
+      margin: 20px auto;
+      padding: 16px;
     }
-    header h1 {
-      margin: 0;
-      font-size: 18px;
-      font-weight: 700;
+
+    .criteria-box {
+      background: var(--panel);
+      margin-bottom: 20px;
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
     }
-    header .subtitle {
-      font-size: 12px;
-      color: #d1d5db;
+
+    .criteria-title {
+      font-size: 20px;
+      margin-bottom: 6px;
     }
-    header .actions {
-      margin-right: auto;
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
+
+    .criteria-subtitle {
+      font-size: 14px;
+      margin-bottom: 12px;
+      color: #94a3b8;
     }
-    .btn {
-      border: none;
+
+    .upload-area {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
       cursor: pointer;
-      padding: 6px 12px;
-      border-radius: 999px;
-      font-size: 12px;
-      display: inline-flex;
+      color: #94a3b8;
+      margin-bottom: 14px;
+    }
+
+    .thumbs {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .thumbs img {
+      width: 110px;
+      height: 110px;
+      object-fit: cover;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+
+    .generate-btn {
+      margin-top: 30px;
+      display: block;
+      width: 100%;
+      padding: 14px;
+      border-radius: 12px;
+      background: var(--accent);
+      border: none;
+      color: white;
+      font-size: 18px;
+      cursor: pointer;
+    }
+
+    .popup-overlay {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(15,23,42,0.85);
+      display: none;
       align-items: center;
       justify-content: center;
-      gap: 6px;
-      white-space: nowrap;
+      z-index: 9999;
     }
-    .btn-secondary {
-      background: rgba(156,163,175,0.35);
-      color: #f9fafb;
-    }
-    .btn-secondary[disabled] {
-      opacity: .8;
-      cursor: default;
-    }
-    .btn-primary {
-      background: #22c55e;
-      color: #f9fafb;
-      font-weight: 600;
-    }
-    .btn-primary:hover { background: #16a34a; }
-    .status-pill {
-      font-size: 11px;
-      padding: 2px 8px;
-      border-radius: 999px;
-      background: rgba(156,163,175,0.4);
-      color: #f9fafb;
-    }
-    main {
-      padding: 16px 20px 24px;
-    }
-    .top-info {
-      margin-bottom: 12px;
-      font-size: 12px;
-      color: #4b5563;
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 14px;
-    }
-    .card {
-      background: #ffffff;
-      border-radius: 18px;
-      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
-      padding: 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      min-height: 150px;
-    }
-    .card-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .card-title {
-      font-size: 14px;
-      font-weight: 600;
-    }
-    .card-count {
-      margin-right: auto;
-      font-size: 11px;
-      color: #4b5563;
-    }
-    .card-subtitle {
-      font-size: 12px;
-      color: #6b7280;
-    }
-    .card-actions {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-    .card-status {
-      font-size: 11px;
-      color: #6b7280;
-    }
-    .file-input { display: none; }
-    .badge-ok { color: #16a34a !important; }
-    .badge-warn { color: #b45309 !important; }
-    .footer-actions {
-      margin-top: 18px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      align-items: center;
-    }
-    .qr-preview {
-      margin-top: 20px;
-      background: #f9fafb;
+
+    .popup-box {
+      background: var(--panel);
+      width: 380px;
+      padding: 20px;
       border-radius: 16px;
+      border: 1px solid var(--border);
+    }
+
+    .popup-box h3 {
+      margin: 0 0 12px;
+      font-size: 19px;
+    }
+
+    .popup-box input {
+      width: 100%;
       padding: 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #0f172a;
+      color: var(--fg);
+      margin-bottom: 16px;
+      font-size: 16px;
     }
-    .qr-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 12px;
+
+    .popup-box button {
+      width: 100%;
+      padding: 12px;
+      font-size: 17px;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
     }
-    .qr-item {
-      background: #fff;
-      border-radius: 14px;
-      padding: 10px;
+
+    .loading {
+      display: none;
+      margin-top: 10px;
+      padding: 12px;
+      background: var(--panel);
+      border-radius: 10px;
       text-align: center;
-      box-shadow: 0 8px 20px rgba(15,23,42,0.06);
-    }
-    .qr-item img {
-      max-width: 160px;
-      height: auto;
-      display: block;
-      margin: 0 auto 4px;
-    }
-    .small {
-      font-size: 11px;
-      color: #6b7280;
-    }
-    .progress {
-      font-size: 12px;
-      color: #111827;
+      border: 1px solid var(--border);
+      color: #a5b4fc;
     }
   </style>
 </head>
+
 <body>
-<script>
-if (!localStorage.getItem("loggedInUser")) {
-    window.location.href = "login.html";
-}
-</script>
-<script>
-// منع الوصول بدون تسجيل دخول
-(function () {
-    const rawUsers = localStorage.getItem("usersDB");
-    const logged = localStorage.getItem("loggedInUser");
 
-    if (!rawUsers || !logged) {
-        window.location.href = "login.html";
-        return;
-    }
+<header>🔍 رفع شواهد ملف الإنجاز - الإصدار المخصص لك</header>
 
-    let users = [];
-    try { users = JSON.parse(rawUsers) || []; } catch(e) { users = []; }
+<div class="container" id="criteriaContainer">
 
-    const me = users.find(u => u.user === logged);
-    if (!me) {
-        localStorage.removeItem("loggedInUser");
-        window.location.href = "login.html";
-        return;
-    }
+  <!-- سيتم توليد المعايير هنا عبر JavaScript -->
 
-    // نحتفظ باسم المستخدم على مستوى الصفحة
-    window.CURRENT_USER = me;
-})();
-</script>
-
-<header>
-  <div class="title-block">
-    <h1>ملف إنجاز المعلم - نسخة ويب كاملة</h1>
-    <div class="subtitle">
-      رفع شواهد المعايير، إنشاء ألبومات، توليد QR، ودمجها داخل ملف PPTX تلقائياً.
-    </div>
-  </div>
-  <div class="actions">
-    <button class="btn btn-secondary" type="button" disabled>
-      ملف الإنجاز (PPTX): <span class="status-pill" id="pptx-status">جاري التحميل...</span>
-    </button>
-    <button class="btn btn-primary" id="btn-generate" type="button" disabled>
-      توليد ملف الإنجاز النهائي (PPTX)
-    </button>
-  
-<button onclick="window.location.href='admin.html'"
-        style="border:none;border-radius:999px;padding:6px 10px;font-size:12px;cursor:pointer;background:#e5e7eb;color:#111827;margin-left:6px;">
-    لوحة المسؤول
-</button>
-
-<button onclick="logout()"
-        style="border:none;border-radius:999px;padding:6px 10px;font-size:12px;cursor:pointer;background:#ef4444;color:white;">
-    تسجيل الخروج
-</button>
 </div>
-</header>
 
-<main>
-  <div class="top-info">
-    القالب المستخدم يتم تحميله تلقائياً من الملف <b>template.pptx</b> الموجود بجانب هذه الصفحة.
-    كل ما عليك هو اختيار صور الشواهد لكل معيار ثم الضغط على "توليد ملف الإنجاز النهائي".
+<button class="generate-btn" onclick="startGeneration()">
+  🚀 توليد ملف الإنجاز
+</button>
+
+<div class="loading" id="loadingBox">⏳ جاري المعالجة… الرجاء الانتظار…</div>
+
+<!-- Popup اسم المعلم -->
+<div class="popup-overlay" id="teacherPopup">
+  <div class="popup-box">
+    <h3>اسم المعلم</h3>
+    <input type="text" id="teacherNameInput" placeholder="اكتب اسم المعلم هنا">
+    <button onclick="confirmTeacherName()">متابعة</button>
   </div>
-
-  <section class="grid" id="criteria-grid"></section>
-
-  <div class="footer-actions">
-    <span class="progress" id="global-status">جارٍ تحميل القالب...</span>
-  </div>
-
-  <section class="qr-preview" id="qr-section" style="display:none;">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-      <strong>معاينة QR لكل معيار</strong>
-      <span class="small">للتأكد أو للحفظ، لكنها مدمجة بالفعل داخل ملف الـ PPTX.</span>
-    </div>
-    <div class="qr-grid" id="qr-grid"></div>
-  </section>
-</main>
+</div>
 
 <script>
-  // إعداداتك
   const CLOUD_NAME = "dayqxxloc";
   const UPLOAD_PRESET = "saud_preset";
-  const VIEWER_BASE_URL = "https://alaa16.netlify.app/";
-  const PPTX_TEMPLATE_URL = "template.pptx"; // نفس اسم ملف القالب بجانب HTML
 
   const CRITERIA = [
-    { id: 1,  title: "المعيار الأول",      subtitle: "أداء الواجبات الوظيفية" },
-    { id: 2,  title: "المعيار الثاني",     subtitle: "التفاعل مع المجتمع المهني" },
-    { id: 3,  title: "المعيار الثالث",     subtitle: "التفاعل مع أولياء الأمور" },
-    { id: 4,  title: "المعيار الرابع",     subtitle: "التنويع في إستراتيجيات التدريس" },
-    { id: 5,  title: "المعيار الخامس",     subtitle: "تحسين نتائج المتعلمين" },
-    { id: 6,  title: "المعيار السادس",     subtitle: "إعداد وتنفيذ خطة التعلم" },
-    { id: 7,  title: "المعيار السابع",     subtitle: "توظيف تقنيات ووسائل التعلم المناسبة" },
-    { id: 8,  title: "المعيار الثامن",     subtitle: "تهيئة البيئة التعليمية" },
-    { id: 9,  title: "المعيار التاسع",     subtitle: "الإدارة الصفية" },
-    { id: 10, title: "المعيار العاشر",     subtitle: "تحليل نتائج المتعلمين وتشخيص مستوياتهم" },
+    { id: 1, title: "المعيار الأول",   subtitle: "أداء الواجبات الوظيفية" },
+    { id: 2, title: "المعيار الثاني",  subtitle: "التفاعل مع المجتمع المهني" },
+    { id: 3, title: "المعيار الثالث",  subtitle: "التفاعل مع أولياء الأمور" },
+    { id: 4, title: "المعيار الرابع",  subtitle: "التنويع في استراتيجيات التدريس" },
+    { id: 5, title: "المعيار الخامس",  subtitle: "تحسين نتائج المتعلمين" },
+    { id: 6, title: "المعيار السادس",  subtitle: "إعداد وتنفيذ خطة التعلم" },
+    { id: 7, title: "المعيار السابع",  subtitle: "توظيف تقنيات ووسائل التعلم المناسبة" },
+    { id: 8, title: "المعيار الثامن",  subtitle: "تهيئة البيئة التعليمية" },
+    { id: 9, title: "المعيار التاسع",  subtitle: "الإدارة الصفية" },
+    { id: 10, title: "المعيار العاشر", subtitle: "تحليل نتائج المتعلمين وتشخيص مستوياتهم" },
     { id: 11, title: "المعيار الحادي عشر", subtitle: "تنوع أساليب وأدوات التقويم" },
-    { id: 12, title: "منجزات أخرى",        subtitle: "منجزات أخرى خلال العام الدراسي ١٤٤٧ هـ" }
+    { id: 12, title: "منجزات أخرى", subtitle: "منجزات أخرى خلال العام الدراسي 1447 هـ" }
   ];
 
   const state = {
-    pptxBuffer: null,       // ArrayBuffer للقالب
-    criteriaFiles: {},      // {id: File[]}
-    albums: {}              // {id: {imageUrls, albumUrl, qrBinary, qrDataURL, mediaName}}
+    teacherName: "",
+    files: {}     // { 1: [File,File], 2:[...], ... }
   };
 
-  const gridEl = document.getElementById("criteria-grid");
-  const globalStatusEl = document.getElementById("global-status");
-  const btnGenerate = document.getElementById("btn-generate");
-  const pptxStatus = document.getElementById("pptx-status");
-  const qrSection = document.getElementById("qr-section");
-  const qrGrid = document.getElementById("qr-grid");
+  function buildUI() {
+    const container = document.getElementById("criteriaContainer");
+    container.innerHTML = "";
 
-  // بناء بطاقات المعايير
-  function buildCards() {
-    CRITERIA.forEach(crit => {
-      const card = document.createElement("div");
-      card.className = "card";
-      card.dataset.criterionId = crit.id;
+    CRITERIA.forEach(c => {
+      const box = document.createElement("div");
+      box.className = "criteria-box";
 
-      const header = document.createElement("div");
-      header.className = "card-header";
+      box.innerHTML = `
+        <div class="criteria-title">${c.title}</div>
+        <div class="criteria-subtitle">${c.subtitle}</div>
 
-      const titleEl = document.createElement("div");
-      titleEl.className = "card-title";
-      titleEl.textContent = crit.title;
+        <div class="upload-area" onclick="pickFiles(${c.id})" id="upload${c.id}">
+          اضغط لرفع شواهد هذا المعيار
+        </div>
 
-      const countEl = document.createElement("div");
-      countEl.className = "card-count";
-      countEl.id = `count-${crit.id}`;
-      countEl.textContent = "0 صورة";
+        <div class="thumbs" id="thumbs${c.id}"></div>
+      `;
 
-      header.appendChild(titleEl);
-      header.appendChild(countEl);
+      container.appendChild(box);
+    });
+  }
+function pickFiles(id) {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.multiple = true;
+    input.accept = "image/*";
 
-      const subtitleEl = document.createElement("div");
-      subtitleEl.className = "card-subtitle";
-      subtitleEl.textContent = crit.subtitle;
+    input.onchange = () => {
+      const files = Array.from(input.files || []);
+      if (!state.files[id]) state.files[id] = [];
 
-      const actions = document.createElement("div");
-      actions.className = "card-actions";
+      state.files[id].push(...files);
+      renderThumbs(id);
+    };
 
-      const fileInput = document.createElement("input");
-      fileInput.type = "file";
-      fileInput.multiple = true;
-      fileInput.accept = "image/*";
-      fileInput.className = "file-input";
-      fileInput.id = `files-${crit.id}`;
+    input.click();
+  }
 
-      const btnSelect = document.createElement("button");
-      btnSelect.type = "button";
-      btnSelect.className = "btn btn-outlined";
-      btnSelect.textContent = "اختيار صور الشواهد";
-      btnSelect.addEventListener("click", () => fileInput.click());
+  function renderThumbs(id) {
+    const div = document.getElementById("thumbs" + id);
+    div.innerHTML = "";
 
-      fileInput.addEventListener("change", () => {
-        const files = Array.from(fileInput.files || []);
-        state.criteriaFiles[crit.id] = files;
-        countEl.textContent = `${files.length} صورة`;
-        const statusEl = document.getElementById(`status-${crit.id}`);
-        if (files.length > 0) {
-          statusEl.textContent = "سيتم رفع الصور عند توليد الملف.";
-          statusEl.classList.add("badge-ok");
-          statusEl.classList.remove("badge-warn");
-        } else {
-          statusEl.textContent = "لم يتم اختيار أي صورة.";
-          statusEl.classList.remove("badge-ok");
-        }
-      });
-
-      const statusText = document.createElement("div");
-      statusText.className = "card-status";
-      statusText.id = `status-${crit.id}`;
-      statusText.textContent = "لم يتم اختيار أي صورة.";
-
-      actions.appendChild(btnSelect);
-
-      card.appendChild(header);
-      card.appendChild(subtitleEl);
-      card.appendChild(actions);
-      card.appendChild(statusText);
-      card.appendChild(fileInput);
-
-      gridEl.appendChild(card);
+    (state.files[id] || []).forEach(file => {
+      const url = URL.createObjectURL(file);
+      const img = document.createElement("img");
+      img.src = url;
+      div.appendChild(img);
     });
   }
 
-  buildCards();
-
-  // تحميل القالب تلقائياً
-  async function loadTemplatePptx() {
-    try {
-      globalStatusEl.textContent = "جارٍ تحميل القالب الافتراضي template.pptx...";
-      const res = await fetch(PPTX_TEMPLATE_URL);
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      const buf = await res.arrayBuffer();
-      state.pptxBuffer = buf;
-      pptxStatus.textContent = "تم تحميل القالب بنجاح";
-      pptxStatus.style.background = "#22c55e33";
-      globalStatusEl.textContent = "القالب جاهز. اختر الصور ثم اضغط توليد الملف.";
-      btnGenerate.disabled = false;
-    } catch (e) {
-      console.error(e);
-      pptxStatus.textContent = "تعذر تحميل القالب";
-      pptxStatus.style.background = "#fecaca";
-      globalStatusEl.textContent = "تعذر تحميل template.pptx. تأكد أنه موجود بجانب ملف HTML وبنفس الاسم.";
-      btnGenerate.disabled = true;
-    }
+  function startGeneration() {
+    document.getElementById("teacherPopup").style.display = "flex";
   }
 
-  window.addEventListener("load", loadTemplatePptx);
+  function confirmTeacherName() {
+    const name = document.getElementById("teacherNameInput").value.trim();
+    if (!name) {
+      alert("الرجاء كتابة اسم المعلم.");
+      return;
+    }
+    state.teacherName = name;
 
-  // رفع صورة واحدة إلى Cloudinary
+    document.getElementById("teacherPopup").style.display = "none";
+    generateAndDownload();
+  }
+
   async function uploadSingleFile(file) {
-    const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
+    const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/upload`;
     const formData = new FormData();
+
     formData.append("file", file);
     formData.append("upload_preset", UPLOAD_PRESET);
 
     const res = await fetch(url, { method: "POST", body: formData });
     if (!res.ok) {
+      const t = await res.text();
+      throw new Error("Cloudinary image upload error: " + t);
+    }
+
+    const data = await res.json();
+    return data.secure_url || data.url;
+  }
+
+  // إنشاء صفحة HTML بسيطة لكل معيار (اسم المعلم + المعيار + الصور)
+  function buildCriterionHtml(teacherName, crit, imageUrls) {
+    const esc = (s) =>
+      String(s || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+
+    const title = esc(crit.title);
+    const subtitle = esc(crit.subtitle);
+    const tName = esc(teacherName);
+
+    const imgsHtml = imageUrls
+      .map((url) => {
+        const u = esc(url);
+        return `<div class="img-box"><img src="${u}" alt="شاهد معيار" loading="lazy"></div>`;
+      })
+      .join("\n");
+
+    return `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>شواهد ${title} - ${tName}</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 16px;
+      font-family: system-ui, -apple-system, "Tajawal", sans-serif;
+      background: #0f172a;
+      color: #e5e7eb;
+    }
+    .wrap {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 22px;
+      margin: 0 0 6px;
+    }
+    h2 {
+      font-size: 16px;
+      font-weight: 400;
+      margin: 0 0 16px;
+      color: #9ca3af;
+    }
+    .meta {
+      font-size: 13px;
+      margin-bottom: 18px;
+      color: #9ca3af;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 12px;
+    }
+    .img-box {
+      background: #020617;
+      border-radius: 12px;
+      padding: 6px;
+      border: 1px solid rgba(148, 163, 184, 0.45);
+    }
+    .img-box img {
+      width: 100%;
+      border-radius: 10px;
+      display: block;
+      max-height: 420px;
+      object-fit: contain;
+      background: #020617;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>شواهد ${title}</h1>
+    <h2>${subtitle}</h2>
+    <div class="meta">المعلم: ${tName}</div>
+    <div class="grid">
+      ${imgsHtml}
+    </div>
+  </div>
+</body>
+</html>`;
+  }
+
+  async function uploadHtmlPage(htmlContent, publicIdHint) {
+    const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/raw/upload`;
+    const blob = new Blob([htmlContent], {
+      type: "text/html;charset=utf-8",
+    });
+    const formData = new FormData();
+    formData.append("file", blob);
+    formData.append("upload_preset", UPLOAD_PRESET);
+
+    if (publicIdHint) {
+      formData.append("public_id", publicIdHint);
+    }
+
+    const res = await fetch(url, { method: "POST", body: formData });
+    if (!res.ok) {
       const txt = await res.text();
-      throw new Error("Cloudinary error: " + txt);
+      throw new Error("Cloudinary HTML upload error: " + txt);
     }
     const data = await res.json();
     return data.secure_url || data.url;
   }
 
-  function makeAlbumURL(imageUrls) {
-    const jsonStr = JSON.stringify(imageUrls);
-    const base64 = btoa(unescape(encodeURIComponent(jsonStr)));
-    const encoded = encodeURIComponent(base64);
-    return VIEWER_BASE_URL.replace(/\/$/, "") + "/#album=" + encoded;
-  }
+  function slugifyForId(name) {
+    const base = String(name || "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "_");
 
-  function dataURLToUint8Array(dataURL) {
-    const base64 = dataURL.split(",")[1];
-    const binaryStr = atob(base64);
-    const len = binaryStr.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) bytes[i] = binaryStr.charCodeAt(i);
-    return bytes;
-  }
-
-  // توليد QR بحجم مناسب للقراءة
-  function generateQRBinary(albumUrl) {
-    return new Promise((resolve, reject) => {
-      const tmpDiv = document.createElement("div");
-      tmpDiv.style.position = "absolute";
-      tmpDiv.style.left = "-9999px";
-      tmpDiv.style.top = "-9999px";
-      document.body.appendChild(tmpDiv);
-
-      const qr = new QRCode(tmpDiv, {
-        text: albumUrl,
-        width: 200,
-        height: 200,
-        correctLevel: QRCode.CorrectLevel.L,
-        margin: 1
-      });
-
-      setTimeout(() => {
-        const canvas = tmpDiv.querySelector("canvas");
-        if (!canvas) {
-          document.body.removeChild(tmpDiv);
-          reject(new Error("فشل توليد QR"));
-          return;
-        }
-        const dataURL = canvas.toDataURL("image/png");
-        const bytes = dataURLToUint8Array(dataURL);
-        document.body.removeChild(tmpDiv);
-        resolve({ dataURL, bytes });
-      }, 400);
-    });
+    return base.replace(/[^a-z0-9_\-]+/g, "") || "teacher";
   }
 
   async function generateAndDownload() {
-    // تأكد القالب موجود
-    if (!state.pptxBuffer) {
-      alert("لم يتم تحميل قالب الـ PPTX. تأكد من وجود template.pptx.");
-      return;
-    }
+    document.getElementById("loadingBox").style.display = "block";
+    const PptxGenJS = window.PptxGenJS;
+    const pres = new PptxGenJS();
+pres.layout = "LAYOUT_WIDE";
 
-    const activeCriteria = CRITERIA.filter(c => (state.criteriaFiles[c.id] || []).length > 0);
-    if (activeCriteria.length === 0) {
-      alert("لم يتم اختيار أي صور لأي معيار.");
-      return;
-    }
+    const templateUrl = "template.pptx";
+    const resp = await fetch(templateUrl);
+    const templateArrayBuffer = await resp.arrayBuffer();
+    pres.load(templateArrayBuffer);
 
-    btnGenerate.disabled = true;
-    globalStatusEl.textContent = "جارٍ رفع الصور وإنشاء الألبومات و QR...";
-    qrGrid.innerHTML = "";
-    qrSection.style.display = "none";
-    state.albums = {};
+    const allSlides = pres.slides;
 
-    // 1) رفع الصور + إنشاء الألبومات + QR
-    let critIndex = 0;
-    for (const crit of activeCriteria) {
-      critIndex++;
-      const files = state.criteriaFiles[crit.id] || [];
-      const statusEl = document.getElementById(`status-${crit.id}`);
+    const firstSlide = allSlides[0];
+    firstSlide.addText(`المعلم: ${state.teacherName}`, {
+      x: 1,
+      y: 1.2,
+      fontSize: 22,
+      fontFace: "Arial",
+      color: "000000",
+    });
 
-      statusEl.textContent = `رفع صور هذا المعيار (${files.length} صورة)...`;
-      statusEl.classList.remove("badge-ok", "badge-warn");
+    const albumsInfo = {};
+
+    for (const crit of CRITERIA) {
+      const arr = state.files[crit.id] || [];
+      if (arr.length === 0) continue;
 
       const imgUrls = [];
-      let fileIndex = 0;
-      for (const f of files) {
-        fileIndex++;
-        globalStatusEl.textContent =
-          `معيار ${critIndex}/${activeCriteria.length} - صورة ${fileIndex}/${files.length} (${crit.title})...`;
-        try {
-          const url = await uploadSingleFile(f);
-          imgUrls.push(url);
-        } catch (e) {
-          console.error(e);
-          statusEl.textContent = "خطأ أثناء رفع بعض الصور.";
-          statusEl.classList.add("badge-warn");
-        }
+      for (const f of arr) {
+        const u = await uploadSingleFile(f);
+        imgUrls.push(u);
       }
 
-      if (imgUrls.length === 0) {
-        statusEl.textContent = "لم يتم رفع أي صورة بنجاح لهذا المعيار.";
-        statusEl.classList.add("badge-warn");
-        continue;
-      }
+      const critMeta =
+        CRITERIA.find((c) => c.id === crit.id) || {
+          title: `المعيار ${crit.id}`,
+          subtitle: "",
+        };
 
-      // تحديث ملف الألبومات على GitHub (حسب اسم المستخدم + رقم المعيار)
-      const username = window.CURRENT_USER || "unknown";
-      await updateAlbumOnGitHub(username, crit.id, imgUrls);
+      const htmlContent = buildCriterionHtml(state.teacherName, critMeta, imgUrls);
 
-      const albumUrl = makeAlbumURL(username, crit.id);
-      const qrInfo = await generateQRBinary(albumUrl);
+      const teacherSlug = slugifyForId(state.teacherName);
+      const publicId = `html_${teacherSlug}_c${crit.id}_${Date.now()}`;
 
-      state.albums[crit.id] = {
-        imageUrls: imgUrls,
-        albumUrl,
-        qrBinary: qrInfo.bytes,
-        qrDataURL: qrInfo.dataURL
+      const pageUrl = await uploadHtmlPage(htmlContent, publicId);
+
+      const qrInfo = await generateQRBinary(pageUrl);
+
+      albumsInfo[crit.id] = {
+        pageUrl,
+        qrBytes: qrInfo.bytes,
+        qrDataURL: qrInfo.dataURL,
       };
-
-      // معاينة QR
-      const qrItem = document.createElement("div");
-      qrItem.className = "qr-item";
-      const t = document.createElement("div");
-      t.style.fontSize = "13px";
-      t.style.marginBottom = "4px";
-      t.textContent = crit.title;
-      qrItem.appendChild(t);
-
-      const imgEl = document.createElement("img");
-      imgEl.src = qrInfo.dataURL;
-      qrItem.appendChild(imgEl);
-
-      const small = document.createElement("div");
-      small.className = "small";
-      small.textContent = "الرابط: " + albumUrl;
-      qrItem.appendChild(small);
-
-      qrGrid.appendChild(qrItem);
-
-      statusEl.textContent = "تم إنشاء الألبوم وربطه بـ QR.";
-      statusEl.classList.add("badge-ok");
     }
 
-    qrSection.style.display = "block";
+    for (const crit of CRITERIA) {
+      const info = albumsInfo[crit.id];
+      if (!info) continue;
 
-    const albumIds = Object.keys(state.albums).map(Number);
-    if (albumIds.length === 0) {
-      globalStatusEl.textContent = "لم تنجح عملية الرفع لأي معيار.";
-      btnGenerate.disabled = false;
-      return;
-    }
+      const slideIndex = crit.id;
+      const slideObj = allSlides[slideIndex];
+      if (!slideObj) continue;
 
-    // 2) تعديل PPTX
-    globalStatusEl.textContent = "جارٍ تعديل ملف الـ PPTX ودمج QR...";
-    try {
-      const arrayBuffer = state.pptxBuffer.slice(0); // نسخة من القالب
-      const zip = await JSZip.loadAsync(arrayBuffer);
-
-      await injectQROnPptx(zip, state.albums);
-
-      const blob = await zip.generateAsync({ type: "blob" });
-      const downloadName = "ملف إنجاز المعلم_QR_ready.pptx";
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = downloadName;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-
-      globalStatusEl.textContent = "تم إنشاء ملف PPTX النهائي ودمج QR بنجاح.";
-    } catch (e) {
-      console.error(e);
-      globalStatusEl.textContent = "حدث خطأ أثناء تعديل ملف PPTX.";
-      alert("حدث خطأ أثناء تعديل ملف PPTX. راجع الكونسول للتفاصيل.");
-    }
-
-    btnGenerate.disabled = false;
-  }
-
-  async function injectQROnPptx(zip, albums) {
-    // تحديث [Content_Types].xml لو ما فيه image/png
-    const ctFile = zip.file("[Content_Types].xml");
-    if (ctFile) {
-      let ct = await ctFile.async("string");
-      if (!ct.includes('image/png')) {
-        const pos = ct.lastIndexOf("</Types>");
-        const defPng = '<Default Extension="png" ContentType="image/png"/>';
-        ct = ct.slice(0, pos) + defPng + ct.slice(pos);
-        zip.file("[Content_Types].xml", ct);
-      }
-    }
-
-    // تأكد من وجود مجلد media
-    zip.folder("ppt")?.folder("media") || zip.folder("ppt").folder("media");
-
-    // إضافة ملفات png للـ QR
-    const critIds = Object.keys(albums).map(Number).sort((a, b) => a - b);
-    for (const id of critIds) {
-      const mediaName = `image_qr_${id}.png`;
-      albums[id].mediaName = mediaName;
-      zip.file(`ppt/media/${mediaName}`, albums[id].qrBinary, { binary: true });
-    }
-
-    // جميع السلايدات
-    const slidePaths = Object.keys(zip.files)
-      .filter(p => p.startsWith("ppt/slides/slide") && p.endsWith(".xml"))
-      .sort((a, b) => {
-        const na = parseInt(a.match(/slide(\d+)\.xml/)[1], 10);
-        const nb = parseInt(b.match(/slide(\d+)\.xml/)[1], 10);
-        return na - nb;
+      const qrImage = info.qrDataURL;
+      slideObj.addImage({
+        data: qrImage,
+        x: 1.0,
+        y: 1.3,
+        w: 2.6,
+        h: 2.6,
       });
 
-    let critPtr = 0;
-
-    for (const slidePath of slidePaths) {
-      let xml = await zip.file(slidePath).async("string");
-      const slideBase = slidePath.split("/").pop();
-      const relsPath = `ppt/slides/_rels/${slideBase}.rels`;
-
-      let relsXml;
-      if (zip.file(relsPath)) {
-        relsXml = await zip.file(relsPath).async("string");
-      } else {
-        relsXml =
-`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>`;
-      }
-
-      // أعلى رقم rId
-      let maxRid = 1;
-      const ridRegex = /Id="rId(\d+)"/g;
-      let m;
-      while ((m = ridRegex.exec(relsXml)) !== null) {
-        const n = parseInt(m[1], 10);
-        if (!isNaN(n) && n > maxRid) maxRid = n;
-      }
-
-      let curIndex = 0;
-      let changed = false;
-
-      while (true) {
-        const start = xml.indexOf("<p:sp", curIndex);
-        if (start === -1) break;
-        const end = xml.indexOf("</p:sp>", start);
-        if (end === -1) break;
-        const blockEnd = end + "</p:sp>".length;
-        const block = xml.slice(start, blockEnd);
-
-        if (block.includes('a:srgbClr') && block.includes('FF00FF') && critPtr < critIds.length) {
-          const critId = critIds[critPtr++];
-          const mediaName = albums[critId].mediaName;
-
-          // نحافظ على <p:spPr> (الموقع والحجم)
-          let spPr = "";
-          const spStart = block.indexOf("<p:spPr");
-          if (spStart !== -1) {
-            const spEnd = block.indexOf("</p:spPr>", spStart);
-            if (spEnd !== -1) {
-              spPr = block.slice(spStart, spEnd + "</p:spPr>".length);
-            }
-          }
-          if (!spPr) spPr = "<p:spPr/>";
-
-          const newRid = "rId" + (++maxRid);
-          const picXml =
-            `<p:pic>` +
-              `<p:nvPicPr>` +
-                `<p:cNvPr id="${1000 + critId}" name="QR ${critId}"/>` +
-                `<p:cNvPicPr/>` +
-                `<p:nvPr/>` +
-              `</p:nvPicPr>` +
-              `<p:blipFill>` +
-                `<a:blip r:embed="${newRid}"/>` +
-                `<a:stretch><a:fillRect/></a:stretch>` +
-              `</p:blipFill>` +
-              spPr +
-            `</p:pic>`;
-
-          xml = xml.slice(0, start) + picXml + xml.slice(blockEnd);
-
-          const insertPos = relsXml.lastIndexOf("</Relationships>");
-          const relLine =
-            `<Relationship Id="${newRid}" ` +
-            `Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" ` +
-            `Target="../media/${mediaName}"/>`;
-          relsXml = relsXml.slice(0, insertPos) + relLine + relsXml.slice(insertPos);
-
-          curIndex = start + picXml.length;
-          changed = true;
-        } else {
-          curIndex = blockEnd;
-        }
-      }
-
-      if (changed) {
-        zip.file(slidePath, xml);
-        zip.file(relsPath, relsXml);
-      }
+      slideObj.addText(info.pageUrl, {
+        x: 1.0,
+        y: 4.0,
+        w: 7.0,
+        h: 0.6,
+        fontSize: 12,
+        fontFace: "Arial",
+        color: "000000",
+      });
     }
+
+    pres.writeFile({
+      fileName: "ملف إنجاز - " + state.teacherName + ".pptx",
+    });
+
+    document.getElementById("loadingBox").style.display = "none";
   }
 
-  btnGenerate.addEventListener("click", () => {
-    generateAndDownload().catch(err => {
-      console.error(err);
-      globalStatusEl.textContent = "حدث خطأ غير متوقع أثناء التنفيذ.";
-      btnGenerate.disabled = false;
+  async function generateQRBinary(text) {
+    return new Promise((resolve, reject) => {
+      QRCode.toDataURL(
+        text,
+        {
+          errorCorrectionLevel: "L",
+          margin: 0,
+          scale: 6,
+        },
+        (err, url) => {
+          if (err) return reject(err);
+
+          const byteString = atob(url.split(",")[1]);
+          const bytes = new Uint8Array(byteString.length);
+          for (let i = 0; i < byteString.length; i++) {
+            bytes[i] = byteString.charCodeAt(i);
+          }
+
+          resolve({
+            dataURL: url,
+            bytes,
+          });
+        }
+      );
     });
-  });
+  }
 </script>
+
+<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.11.0/dist/pptxgen.bundle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+
 <script>
-document.addEventListener("DOMContentLoaded", function () {
-    if (window.CURRENT_USER) {
-        const span = document.getElementById("teacher-name");
-        if (span) span.textContent = window.CURRENT_USER.user;
-    }
-});
-function logout() {
-    localStorage.removeItem("loggedInUser");
-    window.location.href = "login.html";
-}
+  buildUI();
 </script>
 
 </body>
