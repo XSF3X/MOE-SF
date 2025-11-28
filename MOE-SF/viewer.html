@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>عارض الشواهد</title>
+
+  <style>
+    body {
+      margin:0;
+      font-family: "Cairo", sans-serif;
+      background:#0f172a;
+      color:white;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      height:100vh;
+      text-align:center;
+    }
+    #msgBox {
+      max-width:90%;
+      padding:25px;
+      background:#1e293b;
+      border-radius:16px;
+      box-shadow:0 0 20px rgba(0,0,0,0.4);
+    }
+    #msgBox h2 { margin:0 0 10px; }
+    #gallery {
+      display:none;
+      flex-direction:column;
+      align-items:center;
+      background:#111827;
+      width:100%;
+      min-height:100vh;
+      padding:15px;
+      box-sizing:border-box;
+    }
+    #gallery img {
+      width:100%;
+      margin-bottom:14px;
+      border-radius:12px;
+      box-shadow:0 0 15px rgba(0,0,0,0.3);
+    }
+    #backBtn {
+      margin-top:15px;
+      padding:10px 18px;
+      background:#334155;
+      border:0;
+      border-radius:12px;
+      color:white;
+      font-size:15px;
+    }
+  </style>
+</head>
+
+<body>
+
+<div id="msgBox">
+  <h2>مرحباً 👋</h2>
+  <p>الرجاء فتح الصفحة من خلال رابط الشواهد (QR)</p>
+</div>
+
+<div id="gallery"></div>
+
+<script>
+(function(){
+  const hash = window.location.hash;
+  if(!hash || !hash.startsWith("#album=")){
+    return; // ابقِ الصفحة على رسالة "مرحباً"
+  }
+
+  // إخفاء الرسالة
+  document.getElementById("msgBox").style.display = "none";
+
+  const gallery = document.getElementById("gallery");
+  gallery.style.display = "flex";
+
+  try {
+    const encoded = hash.replace("#album=","");
+    const decoded = decodeURIComponent(encoded);
+    const jsonStr = decodeURIComponent( escape(window.atob(decoded)) );
+    const images = JSON.parse(jsonStr);
+
+    images.forEach(url=>{
+      const img = document.createElement("img");
+      img.src = url;
+      gallery.appendChild(img);
+    });
+
+    // زر رجوع
+    const btn = document.createElement("button");
+    btn.id = "backBtn";
+    btn.textContent = "رجوع ↩️";
+    btn.onclick = ()=>window.history.back();
+    gallery.appendChild(btn);
+
+  } catch(e){
+    console.error(e);
+    document.body.innerHTML = "<h2 style='color:white;text-align:center;'>حدث خطأ في فتح الألبوم</h2>";
+  }
+
+})();
+</script>
+
+</body>
+</html>
