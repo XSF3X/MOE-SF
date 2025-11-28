@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>نظام رفع الشواهد - ملف الإنجاز</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+:root {
+  --bg:#0f172a;
+  --fg:#e2e8f0;
+  --panel:#1e293b;
+  --accent:#3b82f6;
+  --border:#334155;
+}
+
+body {
+  margin:0; padding:0;
+  background:var(--bg);
+  color:var(--fg);
+  font-family:'Tajawal',sans-serif;
+}
+
+header {
+  background:var(--panel);
+  padding:16px;
+  text-align:center;
+  font-size:22px;
+  border-bottom:1px solid var(--border);
+}
+
+.container {
+  max-width:1200px;
+  margin:20px auto;
+  padding:16px;
+}
+
+.criteria-box {
+  background:var(--panel);
+  margin-bottom:20px;
+  padding:14px;
+  border:1px solid var(--border);
+  border-radius:14px;
+}
+
+.criteria-title {
+  font-size:20px;
+  margin-bottom:6px;
+}
+
+.criteria-subtitle {
+  font-size:14px;
+  margin-bottom:12px;
+  color:#94a3b8;
+}
+
+.upload-area {
+  border:2px dashed var(--border);
+  border-radius:12px;
+  padding:20px;
+  text-align:center;
+  cursor:pointer;
+  color:#94a3b8;
+  margin-bottom:14px;
+}
+
+.thumbs {
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+}
+
+.thumbs img {
+  width:110px;
+  height:110px;
+  object-fit:cover;
+  border-radius:10px;
+  border:1px solid var(--border);
+}
+
+.generate-btn {
+  margin-top:30px;
+  display:block;
+  width:100%;
+  padding:14px;
+  border-radius:12px;
+  background:var(--accent);
+  border:none;
+  color:white;
+  font-size:18px;
+  cursor:pointer;
+}
+
+.loading {
+  display:none;
+  margin-top:10px;
+  padding:12px;
+  background:var(--panel);
+  border-radius:10px;
+  text-align:center;
+  border:1px solid var(--border);
+  color:#a5b4fc;
+}
+
+.popup-overlay {
+  position:fixed;
+  top:0; left:0;
+  width:100%; height:100%;
+  background:rgba(15,23,42,0.85);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:9999;
+}
+
+.popup-box {
+  background:var(--panel);
+  width:380px;
+  padding:20px;
+  border-radius:16px;
+  border:1px solid var(--border);
+}
+
+.popup-box h3 {
+  margin:0 0 12px;
+}
+
+.popup-box input {
+  width:100%;
+  padding:12px;
+  border-radius:10px;
+  border:1px solid var(--border);
+  background:#0f172a;
+  color:var(--fg);
+  margin-bottom:16px;
+  font-size:16px;
+}
+
+.popup-box button {
+  width:100%;
+  padding:12px;
+  font-size:17px;
+  background:var(--accent);
+  color:white;
+  border:none;
+  border-radius:10px;
+  cursor:pointer;
+}
+</style>
+
+</head>
+<body>
+
+<header>📁 نظام رفع شواهد ملف الإنجاز</header>
+
+<div class="container" id="criteriaContainer"></div>
+
+<button class="generate-btn" onclick="startGeneration()">🚀 توليد ملف الإنجاز</button>
+<div class="loading" id="loadingBox">⏳ جاري المعالجة… الرجاء الانتظار…</div>
+
+<!-- نافذة اسم المعلم -->
+<div class="popup-overlay" id="teacherPopup">
+  <div class="popup-box">
+    <h3>اسم المعلم</h3>
+    <input id="teacherNameInput" placeholder="اكتب اسم المعلم">
+    <button onclick="confirmTeacherName()">متابعة</button>
+  </div>
+</div>
+
+<script>
+const CLOUD_NAME = "dayqxxloc";
+const UPLOAD_PRESET = "saud_preset";
+
+const CRITERIA = [
+  {id:1,title:"المعيار الأول",subtitle:"أداء الواجبات الوظيفية"},
+  {id:2,title:"المعيار الثاني",subtitle:"التفاعل مع المجتمع المهني"},
+  {id:3,title:"المعيار الثالث",subtitle:"التفاعل مع أولياء الأمور"},
+  {id:4,title:"المعيار الرابع",subtitle:"التنويع في استراتيجيات التدريس"},
+  {id:5,title:"المعيار الخامس",subtitle:"تحسين نتائج المتعلمين"},
+  {id:6,title:"المعيار السادس",subtitle:"إعداد وتنفيذ خطة التعلم"},
+  {id:7,title:"المعيار السابع",subtitle:"توظيف تقنيات ووسائل التعلم"},
+  {id:8,title:"المعيار الثامن",subtitle:"تهيئة البيئة التعليمية"},
+  {id:9,title:"المعيار التاسع",subtitle:"الإدارة الصفية"},
+  {id:10,title:"المعيار العاشر",subtitle:"تحليل النتائج وتشخيص المستويات"},
+  {id:11,title:"المعيار الحادي عشر",subtitle:"تنوع أساليب وأدوات التقويم"},
+  {id:12,title:"منجزات أخرى",subtitle:"منجزات أخرى خلال العام الدراسي 1447 هـ"}
+];
+
+const state = {
+  teacherName:"",
+  files:{} // {1:[..],2:[..]}
+};
+
+function buildUI(){
+  const c = document.getElementById("criteriaContainer");
+  c.innerHTML="";
+  CRITERIA.forEach(k=>{
+    c.innerHTML+=`
+      <div class="criteria-box">
+        <div class="criteria-title">${k.title}</div>
+        <div class="criteria-subtitle">${k.subtitle}</div>
+
+        <div class="upload-area" onclick="pickFiles(${k.id})">
+          اضغط لرفع شواهد هذا المعيار
+        </div>
+
+        <div class="thumbs" id="thumbs${k.id}"></div>
+      </div>
+    `;
+  });
+}
+
+function pickFiles(id){
+  const i=document.createElement("input");
+  i.type="file";
+  i.multiple=true;
+  i.accept="image/*";
+  i.onchange=()=>{
+    const files=[...i.files];
+    if(!state.files[id]) state.files[id]=[];
+    state.files[id].push(...files);
+    renderThumbs(id);
+  };
+  i.click();
+}
+
+function renderThumbs(id){
+  const div=document.getElementById("thumbs"+id);
+  div.innerHTML="";
+  (state.files[id]||[]).forEach(f=>{
+    const url=URL.createObjectURL(f);
+    div.innerHTML+=`<img src="${url}">`;
+  });
+}
+
+function startGeneration(){
+  document.getElementById("teacherPopup").style.display="flex";
+}
+
+function confirmTeacherName(){
+  const name=document.getElementById("teacherNameInput").value.trim();
+  if(!name){ alert("يرجى كتابة اسم المعلم"); return; }
+  state.teacherName=name;
+  document.getElementById("teacherPopup").style.display="none";
+  generate();
+}
+
+async function uploadSingleFile(file){
+  const url=`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/upload`;
+  const fd=new FormData();
+  fd.append("file",file);
+  fd.append("upload_preset",UPLOAD_PRESET);
+
+  const r=await fetch(url,{method:"POST",body:fd});
+  if(!r.ok){throw new Error("رفع الصور فشل");}
+  const j=await r.json();
+  return j.secure_url;
+}
+// بناء صفحة HTML لشواهد معيار واحد
+function buildCriterionHtml(teacherName, crit, imageUrls){
+  const esc = s => String(s||"")
+      .replace(/&/g,"&amp;")
+      .replace(/</g,"&lt;")
+      .replace(/>/g,"&gt;");
+
+  const title = esc(crit.title);
+  const subtitle = esc(crit.subtitle);
+  const tName = esc(teacherName);
+
+  const imgs = imageUrls.map(u=>`
+    <div class="img-box">
+      <img src="${u}" alt="شاهد">
+    </div>
+  `).join("\n");
+
+  return `
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>${title} - ${tName}</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body {
+  margin:0; padding:16px;
+  background:#0f172a; color:#e5e7eb;
+  font-family:'Tajawal',sans-serif;
+}
+.wrap { max-width:900px; margin:auto; }
+h1 { font-size:24px; margin:0 0 6px; }
+h2 { font-size:16px; margin:0 0 16px; color:#94a3b8; }
+.meta { font-size:13px; color:#9ca3af; margin-bottom:16px; }
+.grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(250px,1fr));
+  gap:12px;
+}
+.img-box {
+  background:#1e293b;
+  border-radius:12px; padding:6px;
+  border:1px solid #334155;
+}
+.img-box img {
+  width:100%;
+  border-radius:10px;
+  max-height:500px;
+  object-fit:contain;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>${title}</h1>
+  <h2>${subtitle}</h2>
+  <div class="meta">المعلم: ${tName}</div>
+  <div class="grid">
+    ${imgs}
+  </div>
+</div>
+</body>
+</html>
+`;
+}
+
+// رفع صفحة HTML إلى GitHub Pages عبر API
+async function uploadHtmlToGithub(filename, content){
+  const token = localStorage.getItem("GITHUB_TOKEN");
+  if(!token){
+    throw new Error("لا يوجد GitHub Token مخزن");
+  }
+
+  const repo = "XSF3X/MOE-SF";
+  const url = `https://api.github.com/repos/${repo}/contents/evidence/${filename}`;
+
+  // تشفير Base64
+  const encoded = btoa(unescape(encodeURIComponent(content)));
+
+  // فحص هل الملف موجود سابقاً (لكي نرسل sha)
+  let sha = null;
+  const check = await fetch(url);
+  if(check.ok){
+    const data = await check.json();
+    sha = data.sha;
+  }
+
+  const body = {
+    message: "Update evidence file",
+    content: encoded,
+  };
+  if(sha) body.sha = sha;
+
+  const res = await fetch(url,{
+    method:"PUT",
+    headers:{
+      "Authorization":"token "+token,
+      "Content-Type":"application/json"
+    },
+    body:JSON.stringify(body)
+  });
+
+  if(!res.ok){
+    throw new Error("رفع HTML إلى GitHub فشل");
+  }
+
+  return `https://xsf3x.github.io/MOE-SF/evidence/${filename}`;
+}
+
+// إنشاء QR كصورة Base64
+function generateQR(text){
+  return new Promise((resolve,reject)=>{
+    QRCode.toDataURL(text,{errorCorrectionLevel:"L",margin:0,scale:6},(err,url)=>{
+      if(err) reject(err);
+      else resolve(url);
+    });
+  });
+}
+
+async function generate(){
+  document.getElementById("loadingBox").style.display="block";
+
+  const ppt = new PptxGenJS();
+  ppt.layout = "LAYOUT_WIDE";
+
+  // تحميل قالب البوربوينت
+  const resp = await fetch("template.pptx");
+  const buf = await resp.arrayBuffer();
+  ppt.load(buf);
+
+  for(const crit of CRITERIA){
+    const files = state.files[crit.id] || [];
+    if(files.length === 0) continue;
+
+    // رفع الصور → Cloudinary
+    const urls = [];
+    for(const f of files){
+      const u = await uploadSingleFile(f);
+      urls.push(u);
+    }
+
+    // إنشاء صفحة HTML
+    const html = buildCriterionHtml(state.teacherName, crit, urls);
+    const filename = `c${crit.id}.html`;
+
+    // رفع HTML إلى GitHub Pages
+    const htmlUrl = await uploadHtmlToGithub(filename, html);
+
+    // توليد QR
+    const qr = await generateQR(htmlUrl);
+
+    // دمج QR في الشريحة
+    const slide = ppt.slides[crit.id];
+    if(slide){
+      slide.addImage({
+        data: qr,
+        x: 1.0, y: 1.3,
+        w: 2.8, h: 2.8
+      });
+    }
+  }
+
+  ppt.writeFile({fileName:`ملف إنجاز - ${state.teacherName}.pptx`});
+
+  document.getElementById("loadingBox").style.display="none";
+}
+
+// --- تشغيل الواجهة
+buildUI();
+</script>
+
+<!-- مكتبات QR + PPTX -->
+<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.11.0/dist/pptxgen.bundle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+
+</body>
+</html>
